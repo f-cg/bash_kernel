@@ -1,3 +1,6 @@
+from .images import (
+    extract_image_filenames, display_data_for_image, image_setup_cmd
+)
 from ipykernel.kernelbase import Kernel
 from pexpect import replwrap, EOF
 import pexpect
@@ -12,9 +15,6 @@ __version__ = '0.7.2'
 
 version_pat = re.compile(r'version (\d+(\.\d+)+)')
 
-from .images import (
-    extract_image_filenames, display_data_for_image, image_setup_cmd
-)
 
 class IREPLWrapper(replwrap.REPLWrapper):
     """A subclass of REPLWrapper that gives incremental output
@@ -26,6 +26,7 @@ class IREPLWrapper(replwrap.REPLWrapper):
     :param line_output_callback: a callback method to receive each batch
       of incremental output. It takes one string parameter.
     """
+
     def __init__(self, cmd_or_spawn, orig_prompt, prompt_change,
                  extra_init_cmd=None, line_output_callback=None):
         self.line_output_callback = line_output_callback
@@ -53,6 +54,7 @@ class IREPLWrapper(replwrap.REPLWrapper):
 
         # Prompt received, so return normally
         return pos
+
 
 class BashKernel(Kernel):
     implementation = 'bash_kernel'
@@ -91,12 +93,16 @@ class BashKernel(Kernel):
             # bash() function of pexpect/replwrap.py.  Look at the
             # source code there for comments and context for
             # understanding the code here.
-            bashrc = os.path.join(os.path.dirname(pexpect.__file__), 'bashrc.sh')
+            bashrc = os.path.join(os.path.dirname(
+                pexpect.__file__), 'bashrc.sh')
             child = pexpect.spawn("bash", ['--rcfile', bashrc], echo=False,
                                   encoding='utf-8', codec_errors='replace')
-            ps1 = replwrap.PEXPECT_PROMPT[:5] + u'\[\]' + replwrap.PEXPECT_PROMPT[5:]
-            ps2 = replwrap.PEXPECT_CONTINUATION_PROMPT[:5] + u'\[\]' + replwrap.PEXPECT_CONTINUATION_PROMPT[5:]
-            prompt_change = u"PS1='{0}' PS2='{1}' PROMPT_COMMAND=''".format(ps1, ps2)
+            ps1 = replwrap.PEXPECT_PROMPT[:5] + \
+                u'\[\]' + replwrap.PEXPECT_PROMPT[5:]
+            ps2 = replwrap.PEXPECT_CONTINUATION_PROMPT[:5] + \
+                u'\[\]' + replwrap.PEXPECT_CONTINUATION_PROMPT[5:]
+            prompt_change = u"PS1='{0}' PS2='{1}' PROMPT_COMMAND=''".format(
+                ps1, ps2)
 
             # Using IREPLWrapper to get incremental output
             self.bashwrapper = IREPLWrapper(child, u'\$', prompt_change,
@@ -125,7 +131,6 @@ class BashKernel(Kernel):
                     self.send_response(self.iopub_socket, 'stream', message)
                 else:
                     self.send_response(self.iopub_socket, 'display_data', data)
-
 
     def do_execute(self, code, silent, store_history=True,
                    user_expressions=None, allow_stdin=False):
@@ -194,7 +199,8 @@ class BashKernel(Kernel):
 
         if token[0] == '$':
             # complete variables
-            cmd = 'compgen -A arrayvar -A export -A variable %s' % token[1:] # strip leading $
+            # strip leading $
+            cmd = 'compgen -A arrayvar -A export -A variable %s' % token[1:]
             output = self.bashwrapper.run_command(cmd).rstrip()
             completions = set(output.split())
             # append matches including leading $

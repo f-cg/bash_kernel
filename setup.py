@@ -4,13 +4,13 @@
 from distutils.core import setup
 
 packages = \
-['bash_kernel']
+    ['bash_kernel']
 
 package_data = \
-{'': ['*']}
+    {'': ['*']}
 
 install_requires = \
-['pexpect>=4.0']
+    ['pexpect>=4.0']
 
 setup(name='bash_kernel',
       version='0.7.2',
@@ -21,4 +21,4 @@ setup(name='bash_kernel',
       packages=packages,
       package_data=package_data,
       install_requires=install_requires,
-     )
+      )
