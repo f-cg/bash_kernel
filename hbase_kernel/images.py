@@ -4,7 +4,7 @@ import os
 
 # from IPython.
 
-_TEXT_SAVED_IMAGE = "bash_kernel: saved image data to:"
+_TEXT_SAVED_IMAGE = "hbase_kernel: saved image data to:"
 
 image_setup_cmd = """
 display () {

@@ -6,8 +6,8 @@ import argparse
 from jupyter_client.kernelspec import KernelSpecManager
 from IPython.utils.tempdir import TemporaryDirectory
 
-kernel_json = {"argv": [sys.executable, "-m", "bash_kernel", "-f", "{connection_file}"],
-               "display_name": "Bash",
+kernel_json = {"argv": [sys.executable, "-m", "hbase_kernel", "-f", "{connection_file}"],
+               "display_name": "HBase",
                "language": "bash",
                "codemirror_mode": "shell",
                "env": {"PS1": "$"}
@@ -22,7 +22,7 @@ def install_my_kernel_spec(user=True, prefix=None):
         # TODO: Copy resources once they're specified
 
         print('Installing IPython kernel spec')
-        KernelSpecManager().install_kernel_spec(td, 'bash', user=user, prefix=prefix)
+        KernelSpecManager().install_kernel_spec(td, 'hbase', user=user, prefix=prefix)
 
 
 def _is_root():
@@ -34,7 +34,7 @@ def _is_root():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description='Install KernelSpec for Bash Kernel'
+        description='Install KernelSpec for HBase Kernel'
     )
     prefix_locations = parser.add_mutually_exclusive_group()
 

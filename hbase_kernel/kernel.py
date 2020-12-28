@@ -2,6 +2,7 @@ from .images import (
     extract_image_filenames, display_data_for_image, image_setup_cmd
 )
 from ipykernel.kernelbase import Kernel
+import logging
 from pexpect import replwrap, EOF
 import pexpect
 
@@ -14,6 +15,9 @@ import signal
 __version__ = '0.7.2'
 
 version_pat = re.compile(r'version (\d+(\.\d+)+)')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 
 class IREPLWrapper(replwrap.REPLWrapper):
@@ -27,19 +31,18 @@ class IREPLWrapper(replwrap.REPLWrapper):
       of incremental output. It takes one string parameter.
     """
 
-    def __init__(self, cmd_or_spawn, orig_prompt, prompt_change,
+    def __init__(self, cmd_or_spawn, orig_prompt, prompt_change=None,
                  extra_init_cmd=None, line_output_callback=None):
         self.line_output_callback = line_output_callback
         replwrap.REPLWrapper.__init__(self, cmd_or_spawn, orig_prompt,
                                       prompt_change, extra_init_cmd=extra_init_cmd)
 
-    def _expect_prompt(self, timeout=-1):
+    def _expect_prompt(self, timeout=None):
         if timeout == None:
             # "None" means we are executing code from a Jupyter cell by way of the run_command
             # in the do_execute() code below, so do incremental output.
             while True:
-                pos = self.child.expect_exact([self.prompt, self.continuation_prompt, u'\r\n'],
-                                              timeout=None)
+                pos = self.child.expect([r'hbase:\d+:\d+>'], timeout=None)
                 if pos == 2:
                     # End of line received
                     self.line_output_callback(self.child.before + '\n')
@@ -56,8 +59,8 @@ class IREPLWrapper(replwrap.REPLWrapper):
         return pos
 
 
-class BashKernel(Kernel):
-    implementation = 'bash_kernel'
+class HBaseKernel(Kernel):
+    implementation = 'hbase_kernel'
     implementation_version = __version__
 
     @property
@@ -70,19 +73,22 @@ class BashKernel(Kernel):
     @property
     def banner(self):
         if self._banner is None:
-            self._banner = check_output(['bash', '--version']).decode('utf-8')
+            self._banner = 'hbase banner'
         return self._banner
 
-    language_info = {'name': 'bash',
+    language_info = {'name': 'hbase',
                      'codemirror_mode': 'shell',
                      'mimetype': 'text/x-sh',
                      'file_extension': '.sh'}
 
     def __init__(self, **kwargs):
+        self.silent = False
+        logger.debug('init')
         Kernel.__init__(self, **kwargs)
         self._start_bash()
 
     def _start_bash(self):
+        print('_start_bash')
         # Signal handlers are inherited by forked processes, and we can't easily
         # reset it from the subprocess. Since kernelapp ignores SIGINT except in
         # message handlers, we need to temporarily reset the SIGINT handler here
@@ -93,28 +99,30 @@ class BashKernel(Kernel):
             # bash() function of pexpect/replwrap.py.  Look at the
             # source code there for comments and context for
             # understanding the code here.
-            bashrc = os.path.join(os.path.dirname(
-                pexpect.__file__), 'bashrc.sh')
-            child = pexpect.spawn("bash", ['--rcfile', bashrc], echo=False,
-                                  encoding='utf-8', codec_errors='replace')
+            child = pexpect.spawn(
+                "hbase", ['shell'], echo=False, encoding='utf-8', codec_errors='replace')
             ps1 = replwrap.PEXPECT_PROMPT[:5] + \
                 u'\[\]' + replwrap.PEXPECT_PROMPT[5:]
             ps2 = replwrap.PEXPECT_CONTINUATION_PROMPT[:5] + \
                 u'\[\]' + replwrap.PEXPECT_CONTINUATION_PROMPT[5:]
             prompt_change = u"PS1='{0}' PS2='{1}' PROMPT_COMMAND=''".format(
                 ps1, ps2)
+            print(ps1)
+            print(ps2)
+            print(prompt_change)
 
             # Using IREPLWrapper to get incremental output
-            self.bashwrapper = IREPLWrapper(child, u'\$', prompt_change,
-                                            extra_init_cmd="export PAGER=cat",
+            # self.bashwrapper = IREPLWrapper(child, 'hbase:',
+            self.bashwrapper = IREPLWrapper(child, 'hbase:\d+:\d+>',
                                             line_output_callback=self.process_output)
         finally:
             signal.signal(signal.SIGINT, sig)
 
         # Register Bash function to write image data to temporary file
-        self.bashwrapper.run_command(image_setup_cmd)
+        #  self.bashwrapper.run_command(image_setup_cmd)
 
     def process_output(self, output):
+        print('process line')
         if not self.silent:
             image_filenames, output = extract_image_filenames(output)
 
@@ -161,7 +169,7 @@ class BashKernel(Kernel):
             return {'status': 'abort', 'execution_count': self.execution_count}
 
         try:
-            exitcode = int(self.bashwrapper.run_command('echo $?').rstrip())
+            exitcode = 2
         except Exception:
             exitcode = 1
 
@@ -179,42 +187,3 @@ class BashKernel(Kernel):
         else:
             return {'status': 'ok', 'execution_count': self.execution_count,
                     'payload': [], 'user_expressions': {}}
-
-    def do_complete(self, code, cursor_pos):
-        code = code[:cursor_pos]
-        default = {'matches': [], 'cursor_start': 0,
-                   'cursor_end': cursor_pos, 'metadata': dict(),
-                   'status': 'ok'}
-
-        if not code or code[-1] == ' ':
-            return default
-
-        tokens = code.replace(';', ' ').split()
-        if not tokens:
-            return default
-
-        matches = []
-        token = tokens[-1]
-        start = cursor_pos - len(token)
-
-        if token[0] == '$':
-            # complete variables
-            # strip leading $
-            cmd = 'compgen -A arrayvar -A export -A variable %s' % token[1:]
-            output = self.bashwrapper.run_command(cmd).rstrip()
-            completions = set(output.split())
-            # append matches including leading $
-            matches.extend(['$'+c for c in completions])
-        else:
-            # complete functions and builtins
-            cmd = 'compgen -cdfa %s' % token
-            output = self.bashwrapper.run_command(cmd).rstrip()
-            matches.extend(output.split())
-
-        if not matches:
-            return default
-        matches = [m for m in matches if m.startswith(token)]
-
-        return {'matches': sorted(matches), 'cursor_start': start,
-                'cursor_end': cursor_pos, 'metadata': dict(),
-                'status': 'ok'}
