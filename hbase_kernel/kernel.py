@@ -19,10 +19,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-
 class IREPLWrapper(replwrap.REPLWrapper):
     """A subclass of REPLWrapper that gives incremental output
-    specifically for bash_kernel.
+    specifically for hbase_kernel.
 
     The parameters are the same as for REPLWrapper, except for one
     extra parameter:
@@ -100,7 +99,7 @@ class HBaseKernel(Kernel):
             # source code there for comments and context for
             # understanding the code here.
             child = pexpect.spawn(
-                "hbase", ['shell'], echo=False, encoding='utf-8', codec_errors='replace')
+                "/usr/local/hbase/bin/hbase", ['shell'], echo=False, encoding='utf-8', codec_errors='replace')
             ps1 = replwrap.PEXPECT_PROMPT[:5] + \
                 u'\[\]' + replwrap.PEXPECT_PROMPT[5:]
             ps2 = replwrap.PEXPECT_CONTINUATION_PROMPT[:5] + \
